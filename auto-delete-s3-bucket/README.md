@@ -2,7 +2,7 @@
 
 This is a small but handy AWS Lambda function designed to **automatically empty an S3 bucket before deleting it**. 
 
-🛑 By default, AWS does not allow deleting non-empty buckets. This utility solves that by recursively removing all objects and versions before bucket deletion.
+🛑 By default, AWS does not allow deleting non-empty buckets. This utility solves that by detecting Delete event and recursively removing all objects before bucket deletion.
 
 ---
 
@@ -10,6 +10,7 @@ This is a small but handy AWS Lambda function designed to **automatically empty 
 
 - You're cleaning up resources after a deployment.
 - You're building a CloudFormation stack and need to make sure S3 buckets are clean before deletion.
+- You want to delete a service catalog product that include one or more non-empty buckets.
 - You want to automate lifecycle management of temporary buckets.
 
 ---
