@@ -1,0 +1,98 @@
+Resources:
+  GetDateTimeLambdaFunction:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: "index.handler"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Runtime: "python3.12"
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import urllib3
+          from datetime import datetime
+             
+          http = urllib3.PoolManager()
+           
+          def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
+              responseUrl = event['ResponseURL']
+              print("Response url:")
+              print(responseUrl)
+
+              print("responseData:")
+              print(responseData)
+
+              responseBody = {
+                  'Status' : responseStatus,
+                  'Reason' : reason or "See the details in CloudWatch Log Stream: {}".format(context.log_stream_name),
+                  'PhysicalResourceId' : physicalResourceId or context.log_stream_name,
+                  'StackId' : event['StackId'],
+                  'RequestId' : event['RequestId'],
+                  'LogicalResourceId' : event['LogicalResourceId'],
+                  'NoEcho' : noEcho,
+                  'Data' : responseData
+              }
+
+              print("responseBody:")
+              print(responseBody)
+
+              json_responseBody = json.dumps(responseBody)
+
+              print("json response body:")
+              print(json_responseBody)
+
+              headers = {
+                  'content-type' : '',
+                  'content-length' : str(len(json_responseBody))
+              }
+
+              try:
+                  response = http.request('PUT', responseUrl, headers=headers, body=json_responseBody)
+                  print("Status code:", response.status)
+
+              except Exception as e:
+                  print("send(..) failed executing http.request(..):", e)
+
+          def handler(event, context):
+              date = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                
+              response_data = {
+                  'Status': 'SUCCESS',
+                  'bucketName': f'my-bucket-{date}',
+                  'nameSuffix': date
+              }
+              send(event, context, 'SUCCESS', response_data)
+
+
+  SetS3BucketNameCustomResource:
+    Type: "Custom::SetS3BucketName"
+    Properties:
+      ServiceToken: !GetAtt GetDateTimeLambdaFunction.Arn
+
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub 'my-bucket-${SetS3BucketNameCustomResource.nameSuffix}'
+
+  LambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "LambdaExecutionPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
