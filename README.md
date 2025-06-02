@@ -14,7 +14,8 @@ Each subfolder in this repo is a self-contained tip, trick, or small utility –
 
 | Trick | Description |
 |-------|-------------|
-| [`s3-bucket-cleanup-lambda`](./s3-bucket-cleanup-lambda) | Lambda function and CloudFormation template to automatically **empty and delete an S3 bucket**. Useful when cleaning up CloudFormation stacks. |
+| [`auto-delete-s3-bucket`](./auto-delete-s3-bucket) | Lambda function and CloudFormation template to automatically **empty and delete an S3 bucket**. Useful when cleaning up CloudFormation stacks. |
+| [`dynamic-object-name`](./dynamic-object-name) | Lambda function and CloudFormation template to return a **dynamic suffix** name. Useful when launching many instances of the same object in the same AWS account. |
 
 More coming soon! Stay tuned 👀
 
