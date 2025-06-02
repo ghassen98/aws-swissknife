@@ -1,5 +1,5 @@
 Resources:
-  GetDateTimeLambdaFunction:
+  GetSuffixLambdaFunction:
     Type: "AWS::Lambda::Function"
     Properties:
       Handler: "index.handler"
@@ -55,25 +55,32 @@ Resources:
                   print("send(..) failed executing http.request(..):", e)
 
           def handler(event, context):
-              date = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+              try:
+                  date = datetime.utcnow().strftime('%Y%m%d%H%M%S')
                 
-              response_data = {
-                  'Status': 'SUCCESS',
-                  'bucketName': f'my-bucket-{date}',
-                  'nameSuffix': date
-              }
-              send(event, context, 'SUCCESS', response_data)
+                  response_data = {
+                      'Status': 'SUCCESS',
+                      'dateSuffix': date
+                  }
+                  send(event, context, 'SUCCESS', response_data)
+              except Exception as e:
+                  print("Error:", e)
+                  response_data = {
+                      'Status': 'FAILED',
+                      'Reason': str(e)
+                  }
+                  send(event, context, 'FAILED', response_data)
 
 
-  SetS3BucketNameCustomResource:
-    Type: "Custom::SetS3BucketName"
+  GetSuffixCustomResource:
+    Type: "Custom::GenerateSuffixName"
     Properties:
-      ServiceToken: !GetAtt GetDateTimeLambdaFunction.Arn
+      ServiceToken: !GetAtt GetSuffixLambdaFunction.Arn
 
   S3Bucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Sub 'my-bucket-${SetS3BucketNameCustomResource.nameSuffix}'
+      BucketName: !Sub 'my-bucket-${GetSuffixCustomResource.dateSuffix}'
 
   LambdaExecutionRole:
     Type: "AWS::IAM::Role"
