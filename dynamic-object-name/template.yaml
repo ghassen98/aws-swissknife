@@ -5,54 +5,16 @@ Resources:
       Handler: "index.handler"
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
-      Runtime: "python3.12"
+      Runtime: python3.13
       Code:
         ZipFile: |
           import json
           import boto3
           import urllib3
+          import cfnresponse
           from datetime import datetime
              
           http = urllib3.PoolManager()
-           
-          def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
-              responseUrl = event['ResponseURL']
-              print("Response url:")
-              print(responseUrl)
-
-              print("responseData:")
-              print(responseData)
-
-              responseBody = {
-                  'Status' : responseStatus,
-                  'Reason' : reason or "See the details in CloudWatch Log Stream: {}".format(context.log_stream_name),
-                  'PhysicalResourceId' : physicalResourceId or context.log_stream_name,
-                  'StackId' : event['StackId'],
-                  'RequestId' : event['RequestId'],
-                  'LogicalResourceId' : event['LogicalResourceId'],
-                  'NoEcho' : noEcho,
-                  'Data' : responseData
-              }
-
-              print("responseBody:")
-              print(responseBody)
-
-              json_responseBody = json.dumps(responseBody)
-
-              print("json response body:")
-              print(json_responseBody)
-
-              headers = {
-                  'content-type' : '',
-                  'content-length' : str(len(json_responseBody))
-              }
-
-              try:
-                  response = http.request('PUT', responseUrl, headers=headers, body=json_responseBody)
-                  print("Status code:", response.status)
-
-              except Exception as e:
-                  print("send(..) failed executing http.request(..):", e)
 
           def handler(event, context):
               try:
@@ -62,14 +24,15 @@ Resources:
                       'Status': 'SUCCESS',
                       'dateSuffix': date
                   }
-                  send(event, context, 'SUCCESS', response_data)
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  print("Response sent successfully.")
               except Exception as e:
                   print("Error:", e)
                   response_data = {
                       'Status': 'FAILED',
                       'Reason': str(e)
                   }
-                  send(event, context, 'FAILED', response_data)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
 
 
   GetSuffixCustomResource:
