@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Crée une Lambda et l'invoque via une ressource personnalisée.
+
+Resources:
+
+  TestInvokeLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: TestInvokeLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaBasicExecutionPolicy1122
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  LambdaTestFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LambdTestFunction
+      Handler: index.handler
+      Role: !GetAtt TestInvokeLambdaExecutionRole.Arn
+      Timeout: 30
+      Runtime: python3.13
+      Code:
+        ZipFile: |
+          import json
+          import cfnresponse
+
+          def handler(event, context):
+              print("Event received:", json.dumps(event))
+              responseData = {
+                  "Status": "SUCCESS",
+                  "ReceivedEvent": event
+              }
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
+
+  LambdaInvokeCustomResource:
+    Type: Custom::LambdaInvoke
+    Properties:
+      ServiceToken: !GetAtt LambdaTestFunction.Arn
+      Payload:
+        key1: "Ghassen"
+        key2: "Aouinti"
