@@ -1,0 +1,182 @@
+Resources:
+  SSMDocumentTest:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: "GUP-Test-Doc-share"
+      DocumentType: Command
+      UpdateMethod: NewVersion
+      Content:
+        schemaVersion: '2.2'
+        description: "Test SSM Document for sharing"
+        mainSteps:
+          - action: "aws:runPowerShellScript"
+            name: displayversion
+            inputs:
+              runCommand:
+                - |
+                  Write-Host "Document version is 1"
+
+  ShareSSMDocLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ShareSSMDocPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:ListAccountsForParent
+                  - organizations:ListAccounts
+                  - organizations:DescribeAccount
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:ModifyDocumentPermission
+                  - ssm:DescribeDocumentPermission
+                Resource: 
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:document/*'
+
+  ShareSSMDocFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-share-ssm-doc'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt ShareSSMDocLambdaRole.Arn
+      Timeout: 300
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def chunk_list(lst, chunk_size):
+              """Divise une liste en chunks de taille donnée"""
+              for i in range(0, len(lst), chunk_size):
+                  yield lst[i:i + chunk_size]
+
+          def lambda_handler(event, context):
+              """
+              Partage un document SSM avec tous les comptes d'une OU
+              
+              Input event:
+              {
+                  "document_name": "nom-du-document-ssm",
+                  "ou_id": "ou-xxxx-xxxxxxxx"
+              }
+              """
+              
+              try:
+                  document_name = event['document_name']
+                  ou_id = event['ou_id']
+                  action = event.get('action', 'share').lower()
+                  
+                  logger.info(f"Action demandée: {action} pour le document {document_name} et l'OU/Org {ou_id}")
+
+                  org_client = boto3.client('organizations')
+                  ssm_client = boto3.client('ssm')
+
+                  account_ids = []
+                  
+                  # Déterminer si c'est un ID d'organisation ou d'OU
+                  if ou_id.startswith('o-'):
+                      logger.info("Récupération de tous les comptes de l'organisation")
+                      paginator = org_client.get_paginator('list_accounts')
+                      for page in paginator.paginate():
+                          for account in page['Accounts']:
+                              if account['Status'] == 'ACTIVE':
+                                  account_ids.append(account['Id'])
+                  elif ou_id.startswith('ou-'):
+                      logger.info(f"Récupération des comptes de l'OU {ou_id}")
+                      paginator = org_client.get_paginator('list_accounts_for_parent')
+                      for page in paginator.paginate(ParentId=ou_id):
+                          for account in page['Accounts']:
+                              if account['Status'] == 'ACTIVE':
+                                  account_ids.append(account['Id'])
+                  else:
+                      raise ValueError(f"ID invalide: {ou_id}. Doit commencer par 'o-' (organisation) ou 'ou-' (OU)")
+
+                  logger.info(f"Comptes trouvés: {account_ids}")
+                  logger.info(f"Nombre total de comptes: {len(account_ids)}")
+
+                  if not account_ids:
+                      return {
+                          'statusCode': 200,
+                          'body': json.dumps({
+                              'message': f'Aucun compte actif trouvé dans {ou_id}',
+                              'processed_accounts': 0,
+                              'accounts': []
+                          })
+                      }
+
+                  # Découper en chunks de 20 comptes maximum
+                  account_chunks = list(chunk_list(account_ids, 20))
+                  logger.info(f"Nombre de chunks à traiter: {len(account_chunks)}")
+
+                  processed_accounts = 0
+                  for i, chunk in enumerate(account_chunks):
+                      logger.info(f"Traitement du chunk {i+1}/{len(account_chunks)}: {len(chunk)} comptes")
+                      
+                      if action == 'share':
+                          ssm_client.modify_document_permission(
+                              Name=document_name,
+                              PermissionType='Share',
+                              AccountIdsToAdd=chunk
+                          )
+                      elif action == 'unshare':
+                          ssm_client.modify_document_permission(
+                              Name=document_name,
+                              PermissionType='Share',
+                              AccountIdsToRemove=chunk
+                          )
+                      
+                      processed_accounts += len(chunk)
+                      logger.info(f"Chunk {i+1} traité avec succès. Total traité: {processed_accounts}")
+
+                  if action == 'share':
+                      message = f'Document {document_name} partagé avec succès vers {processed_accounts} comptes en {len(account_chunks)} appels.'
+                  elif action == 'unshare':
+                      message = f'Partage retiré pour le document {document_name} sur {processed_accounts} comptes en {len(account_chunks)} appels.'
+                  else:
+                      raise ValueError(f"Action invalide: {action}. Doit être 'share' ou 'unshare'")
+
+                  logger.info(message)
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': message,
+                          'processed_accounts': processed_accounts,
+                          'total_chunks': len(account_chunks),
+                          'accounts': account_ids,
+                          'target_id': ou_id
+                      })
+                  }
+
+              except Exception as e:
+                  logger.error(f"Erreur lors du traitement: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': str(e),
+                          'message': 'Erreur lors du partage/unshare du document SSM'
+                      })
+                  }
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN de la fonction Lambda
+    Value: !GetAtt ShareSSMDocFunction.Arn
