@@ -2,12 +2,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Document SSM PowerShell avec gestion de versions
 
 Resources:
-  SSMDocumentInstallDotnetRuntimes:
+  SSMDocument:
     Type: AWS::SSM::Document
     Properties:
-      Name: "GUP-Test-Doc-versions"
+      Name: "Test-Doc-versions"
       DocumentType: Command
-      UpdateMethod: NewVersion
+      UpdateMethod: NewVersion # Crée une nouvelle version à chaque mise à jour
       Content:
         schemaVersion: '2.2'
         description: "Test SSM Document (v2)"
@@ -18,14 +18,14 @@ Resources:
               runCommand:
                 - |
                   Write-Host "Document version is 2"
-                  # Ajoute ici les commandes PowerShell pour la version 2
+                  # Ajoute ici les changements pour la version 2
 
   RunSSMDocumentV1:
     Type: AWS::SSM::Association
     Properties:
-      Name: GUP-Test-Doc-versions
-      DocumentVersion: "1"
+      Name: Test-Doc-versions
+      DocumentVersion: "1" # Spécifie la version du document à utiliser
       Targets:
         - Key: InstanceIds
           Values:
-            - i-0ee195831b91d4545 # Remplace par l'ID de ton instance cible
+            - i-0ee195831b91d1234 # Remplace par l'ID de ton instance cible
