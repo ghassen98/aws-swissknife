@@ -2,7 +2,7 @@ Resources:
   SSMDocumentTest:
     Type: AWS::SSM::Document
     Properties:
-      Name: "GUP-Test-Doc-share"
+      Name: "Test-Doc-share"
       DocumentType: Command
       UpdateMethod: NewVersion
       Content:
