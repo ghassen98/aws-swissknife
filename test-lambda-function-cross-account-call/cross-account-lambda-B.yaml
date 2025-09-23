@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Template pour invoquer la Lambda GetSuffix du compte A et créer un bucket S3'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: 'Environnement (dv, ti, ta, cr, pr)'
+    AllowedValues: ['dv', 'ti', 'ta', 'cr', 'pr']
+
+  GetSuffixLambdaFunctionArnParameter:
+    Type: String
+    Description: 'ARN de la fonction Lambda GetSuffix dans le compte A'
+    Default: 'arn:aws:lambda:ca-central-1:123456789123:function:get-suffix-lambda'
+
+Resources:
+  GetSuffixCustomResource:
+    Type: "Custom::GenerateSuffixName"
+    Properties:
+      ServiceToken: !Ref GetSuffixLambdaFunctionArnParameter
+      
+  TestS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'tests3bucket-${Environment}-${GetSuffixCustomResource.dateSuffix}'
+    DependsOn: GetSuffixCustomResource
+
+Outputs:
+  GeneratedSuffix:
+    Description: 'Suffix généré par la Lambda GetSuffix'
+    Value: !GetAtt GetSuffixCustomResource.dateSuffix
+  
+  TestS3BucketName:
+    Description: 'Nom du bucket S3 créé avec le suffix'
+    Value: !Ref TestS3Bucket
+    
+  TestS3BucketArn:
+    Description: 'ARN du bucket S3 créé'
+    Value: !GetAtt TestS3Bucket.Arn

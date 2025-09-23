@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda GetSuffix - Déploiement dans le compte A'
+
+Parameters:
+  Environment:
+    Type: String
+    Description: 'Environnement (dv, ti, ta, cr, pr)'
+    AllowedValues: ['dv', 'ti', 'ta', 'cr', 'pr']
+
+  OrganizationId:
+    Type: String
+    Description: 'ID de l organisation AWS'
+    Default: 'o-xxxxxxxx'
+
+Resources:
+  GetSuffixLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Description: "Role de la fonction Lambda pour generer les noms des buckets S3"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: "lambda.amazonaws.com"
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: "GetSuffixLambdaPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+
+  GetSuffixLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/get-suffix-lambda-${Environment}'
+      RetentionInDays: 14
+
+  GetSuffixLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 'get-suffix-lambda'
+      Description: "Fonction Lambda qui genere un suffix dynamique"
+      Handler: "index.handler"
+      Role: !GetAtt GetSuffixLambdaExecutionRole.Arn
+      Timeout: 30
+      Runtime: python3.13
+      LoggingConfig:
+        ApplicationLogLevel: INFO 
+        LogFormat: JSON
+        LogGroup: !Ref GetSuffixLambdaLogGroup
+        SystemLogLevel: INFO
+      Code: 
+        ZipFile: |
+          import cfnresponse
+          from datetime import datetime
+          import json
+
+          def handler(event, context):
+              try:
+                  print("Event reçu:", json.dumps(event, indent=2))
+                  
+                  # Générer la date et l'heure au format attendu
+                  date = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                  
+                  print(f"Suffix généré: {date}")
+                  
+                  # Préparer les données de réponse
+                  response_data = {
+                      'Status': 'SUCCESS',
+                      'dateSuffix': date,
+                      'timestamp': datetime.utcnow().isoformat()
+                  }
+                  
+                  print("Données de réponse:", json.dumps(response_data, indent=2))
+                  
+                  # Envoyer la réponse
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  
+              except Exception as e:
+                  error_msg = f"Erreur lors de la génération du suffix : {str(e)}"
+                  print(error_msg)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': error_msg})
+
+  # Permission pour permettre l'invocation cross-account
+  GetSuffixLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetSuffixLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: "*"
+      PrincipalOrgID: !Ref OrganizationId
+
+Outputs:
+  GetSuffixLambdaArn:
+    Description: 'ARN de la fonction Lambda GetSuffix'
+    Value: !GetAtt GetSuffixLambdaFunction.Arn
+    Export:
+      Name: !Sub 'GetSuffixLambda-Arn'
+  
+  GetSuffixLambdaName:
+    Description: 'Nom de la fonction Lambda GetSuffix'
+    Value: !Ref GetSuffixLambdaFunction
+    Export:
+      Name: !Sub 'GetSuffixLambda-Name'
