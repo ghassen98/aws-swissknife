@@ -15,7 +15,13 @@ Each subfolder in this repo is a self-contained tip, trick, or small utility –
 | Trick | Description |
 |-------|-------------|
 | [`auto-delete-s3-bucket`](./auto-delete-s3-bucket) | Lambda function and CloudFormation template to automatically **empty and delete an S3 bucket**. Useful when cleaning up CloudFormation stacks. |
-| [`dynamic-object-name`](./dynamic-object-name) | Lambda function and CloudFormation template to return a **dynamic suffix** name. Useful when launching many instances of the same object in the same AWS account. |
+| [`dynamic-object-name`](./dynamic-object-name) | CloudFormation + Lambda example that creates an S3 bucket with a static prefix and a dynamic suffix to avoid name collisions. |
+| [`create-ssm-doc-and-share-it-via-lambda-backed-custom-resource`](./create-ssm-doc-and-share-it-via-lambda-backed-custom-resource) | Create or update an SSM Document and share it to accounts or an OU using a Lambda-backed custom resource. |
+| [`deploy-and-call-lambda-function-cross-account-call`](./deploy-and-call-lambda-function-cross-account-call) | Two-template example showing how to deploy a Lambda in one account and invoke it from another (cross-account invocation patterns). |
+| [`deploy-and-call-multiversion-ssm-doc`](./deploy-and-call-multiversion-ssm-doc) | Deploy and manage multiple versions of an SSM Document and show how to invoke them. |
+| [`inject-secret-to-EC2-instance`](./inject-secret-to-EC2-instance) | Provision EC2 instances that retrieve secrets securely at boot using IAM and Secrets Manager / SSM. |
+| [`invoke-lambda-function-via-custom-resource`](./invoke-lambda-function-via-custom-resource) | Example of invoking custom provisioning logic during CloudFormation deployment using a Lambda-backed custom resource. |
+| [`lambda-share-ssm-doc-to-ou`](./lambda-share-ssm-doc-to-ou) | Lambda-based helper to share SSM Documents across AWS Organizations OUs. |
 
 More coming soon! Stay tuned 👀
 
