@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an SSM Document and share it via a Lambda-backed custom resource.
+Parameters:
+  AccountList:
+    Type: String
+    Description: List of AWS Account IDs to share the SSM Document with
+    Default: "111111111111,222222222222" # Replace with actual account IDs
+
+Mappings:
+  ssmdocuments:
+    document1:
+      Value: test-doc-1
+    document2:
+      Value: test-doc-2
+
+Resources:
+  SSMDocument1:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: !FindInMap [ssmdocuments, document1, Value] # Use the mapping to get the document name
+      DocumentType: Command
+      Content:
+        schemaVersion: '2.2'
+        description: Sample SSM Document for testing share
+        mainSteps:
+        - action: aws:runShellScript
+          name: example
+          inputs:
+            runCommand:
+            - echo Hello from SSM Document
+
+  SSMDocument2:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: !FindInMap [ssmdocuments, document2, Value] # Use the mapping to get the document name
+      DocumentType: Command
+      Content:
+        schemaVersion: '2.2'
+        description: Sample SSM Document for testing share
+        mainSteps:
+        - action: aws:runShellScript
+          name: example
+          inputs:
+            runCommand:
+            - echo Hello from SSM Document
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: SSMSharePolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:ModifyDocumentPermission
+            - ssm:DescribeDocument
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+
+  ShareSSMLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      FunctionName: ShareSSMDocumentFunction
+      Runtime: python3.13
+      Timeout: 60
+      Environment:
+        Variables:
+          DOC1: !FindInMap [ssmdocuments, document1, Value]
+          DOC2: !FindInMap [ssmdocuments, document2, Value]
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import os
+          import cfnresponse
+
+          DOCUMENT_NAMES = [
+              os.environ['DOC1'],
+              os.environ['DOC2']
+          ]
+
+          def handler(event, context):
+              ssm = boto3.client('ssm')
+
+              account_list = event['ResourceProperties']['AccountList'].split(',')
+
+              try:
+                  if event['RequestType'] in ['Create', 'Update']:
+                      for doc_name in DOCUMENT_NAMES:
+                          ssm.modify_document_permission(
+                              Name=doc_name,
+                              PermissionType='Share',
+                              AccountIdsToAdd=account_list
+                          )
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'Message': 'SSM Documents shared'})
+                  elif event['RequestType'] == 'Delete':
+                      for doc_name in DOCUMENT_NAMES:
+                          ssm.modify_document_permission(
+                              Name=doc_name,
+                              PermissionType='Share',
+                              AccountIdsToRemove=account_list
+                          )
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {'Message': 'SSM Documents unshared'})
+              except Exception as e:
+                  print(f"Error: {e}")
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Message': str(e)})
+
+  CustomResource:
+    Type: Custom::ShareSSMDocument
+    DependsOn:
+      - SSMDocument1
+      - SSMDocument2
+    Properties:
+      ServiceToken: !GetAtt ShareSSMLambdaFunction.Arn
+      AccountList: !Ref AccountList
