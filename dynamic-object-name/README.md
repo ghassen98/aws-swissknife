@@ -41,7 +41,26 @@ aws cloudformation deploy \
 
 ---
 
-## 🧹 How to clean up
+## � Deploy helpers
+
+Two small helper scripts are included to simplify deployment during development:
+
+- `deploy.sh` — deploys the stack (accepts extra `aws cloudformation deploy` args). Defaults: stack `dynamic-object-name`, template `dynamic-object-name.yaml`.
+- `delete-stack.sh` — deletes the stack. Defaults to `dynamic-object-name`.
+
+Make them executable and run:
+
+```bash
+chmod +x deploy.sh delete-stack.sh
+./deploy.sh
+# or with custom stack name
+STACK_NAME=my-test ./deploy.sh --parameter-overrides BucketPrefix=my-bucket-
+
+./delete-stack.sh
+```
+
+
+## �🧹 How to clean up
 
 To delete all resources created by this stack, simply delete the stack:
 
