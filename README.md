@@ -22,6 +22,7 @@ Each subfolder in this repo is a self-contained tip, trick, or small utility –
 | [`inject-secret-to-EC2-instance`](./inject-secret-to-EC2-instance) | Provision EC2 instances that retrieve secrets securely at boot using IAM and Secrets Manager / SSM. |
 | [`invoke-lambda-function-via-custom-resource`](./invoke-lambda-function-via-custom-resource) | Example of invoking custom provisioning logic during CloudFormation deployment using a Lambda-backed custom resource. |
 | [`lambda-share-ssm-doc-to-ou`](./lambda-share-ssm-doc-to-ou) | Lambda-based helper to share SSM Documents across AWS Organizations OUs. |
+| [`secret-update-notification`](./secret-update-notification) | Monitor a Secrets Manager secret and send SNS email notifications when its value is updated. |
 
 More coming soon! Stay tuned 👀
 
